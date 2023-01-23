@@ -1,77 +1,68 @@
 const fs = require('fs')
 const emailValidator = require('deep-email-validator')
-const { parse } = require('csv-parse')
 
-const CSVFILE = 'subscribed_members_export_60bf5ff8a1.csv'
-const NEWFILENAME = 'export.csv'
+const CSV_FILE = process.argv[2]
+const VALIDATED_FILE_NAME = 'validatedEmails.csv'
+const NO_VALID_FILE_NAME = 'noValidEmails.csv'
 
 const readCSV = (csv) => {
-  let data = []
-  console.log('File reading started')
-  fs.createReadStream(csv)
-    .pipe(
-      parse({
-        delimiter: ',',
-        columns: true,
-        ltrim: true,
-      })
-    )
-    .on('data', (row) => {
-      data.push(row)
-    })
-    .on('error', (error) => {
-      console.log(error.message)
-    })
-    .on('end', () => {
-      console.log('File reading finished')
-    })
-
-  return new Promise((res) =>
-    setTimeout(() => {
-      res(data)
-    }, 2000)
-  )
+  return fs
+    .readFileSync(csv, { encoding: 'utf-8' })
+    .split('\n')
+    .map((row) => row.split(','))
 }
 
 const writeCSV = (filename, content) => {
-  console.log('Creating new file => ' + filename)
-  fs.writeFile(filename, content, (err) => {
+  console.log('New file created => ' + filename)
+  fs.writeFileSync(filename, content, (err) => {
     if (err) throw err
   })
 }
 
 const appendCSV = (filename, content) => {
-  fs.appendFile(filename, content, (err) => {
+  fs.appendFileSync(filename, content, (err) => {
     if (err) throw err
   })
 }
 
-const isEmailValid = (e) => {
-  return emailValidator.validate({ email: e, validateTypo: false })
+const isEmailValid = async (e) => {
+  let answer = await emailValidator.validate({ email: e, validateTypo: false })
+  return { email: e, validation: answer }
 }
 
-const verifyEmails = async () => {
-  let noValid = 0
-  let valid = 0
-  let data = await readCSV(CSVFILE)
-  let columns = Object.keys(data[0])
-  let csvContent = columns + '\n'
-  let numberOfVerifications = 5000
-  writeCSV(NEWFILENAME, csvContent)
-  writeCSV('noValidEmails.csv', csvContent)
-  console.log('Verifying emails')
-  for (let i = 0; i < numberOfVerifications; i++) {
-    isEmailValid(data[i]['Email Address']).then((res) => {
-      if (res.valid) {
-        appendCSV(NEWFILENAME, columns.map((column) => data[i][column]).join(',') + '\n')
-        valid += 1
-      } else {
-        appendCSV('noValidEmails.csv', columns.map((column) => data[i][column]).join(',') + '\n')
-        noValid += 1
-      }
-    })
-    if (i === numberOfVerifications - 1) setTimeout(() => console.log('Writing file => ' + NEWFILENAME), 15000)
+const verifyEmails = async (numberOfVerifications) => {
+  console.log('Reading file...')
+  let data = readCSV(CSV_FILE)
+  console.log('File reading finished')
+  let columns = data[0]
+  let validCsvContent = columns + '\n'
+  let noValidCsvContent = columns + '\n'
+  let emailAddress = 0
+
+  console.log('Verifying emails...')
+  let validations = []
+  for (i = 1; i <= numberOfVerifications; i++) {
+    validations.push(isEmailValid(data[i][emailAddress]))
   }
+  let count = 0
+  validations.forEach((promise) =>
+    promise.then(() => {
+      process.stdout.write('                   \r')
+      process.stdout.write('Progress: ' + (++count * 100) / numberOfVerifications + '%\r')
+    })
+  )
+  let resolvedPromises = await Promise.allSettled(validations)
+  console.log('Progress: 100.0%\nEmail verification finished')
+
+  console.log('Writing files....')
+  writeCSV(VALIDATED_FILE_NAME, validCsvContent)
+  writeCSV(NO_VALID_FILE_NAME, noValidCsvContent)
+  resolvedPromises.forEach((i) =>
+    i['value']['validation']['valid']
+      ? appendCSV(VALIDATED_FILE_NAME, data.find((row) => row[emailAddress] === i['value']['email']) + '\n')
+      : appendCSV(NO_VALID_FILE_NAME, data.find((row) => row[emailAddress] === i['value']['email']) + '\n')
+  )
+  console.log('Process finished')
 }
 
-verifyEmails()
+verifyEmails(1000)
