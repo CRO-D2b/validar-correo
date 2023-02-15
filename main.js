@@ -59,8 +59,14 @@ const verifyEmails = async (numberOfVerifications) => {
   writeCSV(NO_VALID_FILE_NAME, noValidCsvContent)
   resolvedPromises.forEach((i) =>
     i['value']['validation']['valid']
-      ? appendCSV(VALIDATED_FILE_NAME, data.find((row) => row[emailAddress] === i['value']['email']) + '\n')
-      : appendCSV(NO_VALID_FILE_NAME, data.find((row) => row[emailAddress] === i['value']['email']) + '\n')
+      ? appendCSV(
+          VALIDATED_FILE_NAME,
+          data.find((row) => row[emailAddress] === i['value']['email']) + '\n'
+        )
+      : appendCSV(
+          NO_VALID_FILE_NAME,
+          data.find((row) => row[emailAddress] === i['value']['email']) + '\n'
+        )
   )
   console.log('Process finished')
 }

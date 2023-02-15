@@ -1,5 +1,16 @@
-const emailValidator = require('deep-email-validator')
+// import { validate } from 'deep-email-validator'
 
-console.log(process.argv[2])
+import EmailValidator from 'email-deep-validator'
 
-emailValidator.validate({ email: process.argv[2], validateTypo: false }).then((res) => console.log(res))
+const emailValidator = new EmailValidator()
+const a = await emailValidator.verify('dog_fabian@hotmail.com')
+console.log(a)
+
+// const validation = async () => {
+//   return validate({
+//     email: 'fabianmorag0405@gmail.com',
+//     validateTypo: false
+//   })
+// }
+
+// export default validation
